@@ -1,0 +1,62 @@
+=head1 NAME
+
+vlogdump
+
+=head1 DESCRIPTION
+
+Tool to parse varnishlog output and keep track of transactions.
+Match those that we want to debug and show detailed information
+about them.
+
+This tool is meant to help when setting up or troubleshooting
+a varnish configuration.
+
+=head1 OPTIONS
+
+  This being an C<awk> script, all options need to be supplied
+  in the form C<< -v <option>=<value> >>.
+
+=over
+
+=item show_req_headers=0|1
+
+Turn on or off the output of HTTP request headers
+
+=item show_resp_headers=0|1
+
+Turn on or off the output of HTTP response headers
+
+=item req_headers_match=<regexp>
+
+Shows only transactions with request headers
+(any header) matching the given regular expression
+
+=item only_hits=0|1
+
+Shows only transactions that were served from the cache
+
+=item only_misses=0|1
+
+Shows only transactions that were served by going to
+the backend server.
+
+=item only_slow=1
+
+=item only_slow=<ms>
+
+Shows only requests that are considered slow.
+The time used is the backend response time.
+If you use C<only_slow=1>, the default threshold is 1s.
+You can also specify your own threshold, using
+for example C<only_slow=500>. Value is in milliseconds.
+
+=item url_match=<regexp>
+
+Show only the transactions for URLs matching the
+given regular expression.
+
+=back
+
+=head1 AUTHOR
+
+Cosimo Streppone, C<< cosimo@opera.com >>
