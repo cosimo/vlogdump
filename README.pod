@@ -31,6 +31,19 @@ Turn on or off the output of HTTP response headers
 Shows only transactions with request headers
 (any header) matching the given regular expression
 
+Prepend '!' to the pattern to negate the meaning,
+to display only transactions that *do not* match the
+pattern.
+
+=item resp_headers_match=<regexp>
+
+Shows only transactions with response headers
+(any header) matching the given regular expression
+
+Prepend '!' to the pattern to negate the meaning,
+to display only transactions that *do not* match the
+pattern.
+
 =item only_hits=0|1
 
 Shows only transactions that were served from the cache

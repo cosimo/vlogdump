@@ -23,7 +23,19 @@
 #
 #   req_headers_match=<regexp>
 #       Shows only transactions with request headers
-#       (any header) matching the given regular expression
+#       (any header) matching the given regular expression.
+#
+#       Prepend '!' to the pattern to negate the meaning,
+#       to display only transactions that *do not* match the
+#       pattern.
+#
+#   resp_headers_match=<regexp>
+#       Shows only transactions with response headers
+#       (any header) matching the given regular expression.
+#
+#       Prepend '!' to the pattern to negate the meaning,
+#       to display only transactions that *do not* match the
+#       pattern.
 #
 #   only_hits=0|1
 #       Shows only cache hits
@@ -72,6 +84,12 @@ BEGIN {
         req_headers_match_positive = 0
     }
 
+    resp_headers_match_positive = 1
+    if (resp_headers_match && substr(resp_headers_match, 1, 1) == "!") {
+        resp_headers_match = substr(resp_headers_match, 2)
+        resp_headers_match_positive = 0
+    }
+
 }
 
 #
@@ -115,6 +133,13 @@ function show_request () {
         if (req_headers_match_positive == 1 && RxHeaders[xid] !~ req_headers_match)
             return 0
         if (req_headers_match_positive == 0 && RxHeaders[xid] ~ req_headers_match)
+            return 0
+    }
+
+    if (resp_headers_match) {
+        if (resp_headers_match_positive == 1 && TxHeaders[xid] !~ resp_headers_match)
+            return 0
+        if (resp_headers_match_positive == 0 && TxHeaders[xid] ~ resp_headers_match)
             return 0
     }
 
@@ -246,7 +271,9 @@ $2 == "RxHeader" && $3 == "c" {
 #     }
 #
 # vcl_hit() could still return "pass", in which case
-# the request is definitely a miss.
+# the request definitely results in a miss from the
+# client POV, even if varnish could have the object
+# in cache, which technically would make it a hit.
 # 
 #  205 Hit          c 933975905
 $2 == "Hit" {
@@ -360,16 +387,5 @@ $2 == "ReqEnd" {
 END {
     print_global_stats()
 }
-
-# TODO these logtags need to be tracked
-#  205 VCL_call     c recv
-#  205 VCL_return   c lookup
-#  205 VCL_call     c hash
-#  205 VCL_return   c hash
-#  205 VCL_call     c hit
-#  205 VCL_return   c deliver
-
-# TODO hit/miss logic is flawed and needs fixing
-#
 
 # vim: ts=4 sw=4 tw=78
