@@ -11,10 +11,69 @@ about them.
 This tool is meant to help when setting up or troubleshooting
 a varnish configuration.
 
+=head1 EXAMPLES
+
+Here's some examples of usage.
+
+=head2 Show all requests that are cache misses
+
+  $ varnishlog | vlogdump -v only_misses=1
+
+  172.22.0.15 => GET /assets/tn/m/mq/e85ed0a7b1b87120a0a2bfa025531c6733a48802 HTTP/1.0 MISS
+              <= 200 OK                                                          28.432 ms
+  172.22.0.18 => GET /assets/tn/m/mq/5a9e9440c5c85e8dc5d65e03e15c95e390901fa7 HTTP/1.0 MISS
+              <= 200 OK                                                          36.905 ms
+  172.22.0.18 => GET /assets//icons/categories/te/icon32x32-technology.png HTTP/1.0 MISS
+              <= 304 Not Modified                                                 0.589 ms
+  172.22.0.15 => GET /api/fetch/article-preview/?client=2&language=en-GB HTTP/1.1 MISS
+              <= 301 MOVED PERMANENTLY                                            8.381 ms
+  172.22.0.18 => GET /assets/tn/m/mq/c3830e95b717761005e26ce49ebab253e0ccb40b HTTP/1.0 MISS
+              <= 200 OK                                                         291.354 ms
+  172.22.0.18 => GET /api/1.0/category/list?client=2&language=en-GB HTTP/1.1 MISS
+              <= 200 OK                                                          58.025 ms
+  ...
+
+=head2 Show only requests that are cache hits
+
+Same as above, but C<< -v only_hits=1 >>.
+
+=head2 Show only requests (not) for certain URLs
+
+  $ varnishlog | vlogdump -v url_match=assets
+
+To negate the pattern, prepend a C<!> character before the
+regular expression. You will get only requests for URLs that
+B<DO NOT> match C<assets>:
+
+  $ varnishlog | vlogdump -v url_match=!assets
+
+=head2 For each transaction, show the request headers
+
+  $ varnishlog | vlogdump -v show_req_headers=1
+
+  172.22.0.15 => GET /assets/3a626ed2f029fc5802c244673c6e168914568080 HTTP/1.0 MISS
+              <= 200 OK                                                          51.483 ms
+      req.http.Host = discovery.opera.com
+      req.http.User-Agent = Amazon CloudFront
+      req.http.X-Forwarded-For = 111.12.34.56
+      req.http.X-Amz-Cf-Id = NS3KqU_AKnueKyQcJWQXbLyVAYR7jvPJ5QGl9raDg0AZZaPkt87avA==
+      req.http.Connection = keep-alive
+      ...
+
+=head2 Only show transactions where the request headers match X
+
+Where C<X> can be a string or a regular expression:
+
+  $ varnishlog | vlogdump -v show_req_headers=1 -v req_headers_match=X
+
+=head2 ...
+
+and there's more. Check the full list of options below.
+
 =head1 OPTIONS
 
-  This being an C<awk> script, all options need to be supplied
-  in the form C<< -v <option>=<value> >>.
+This being an C<awk> script, all options need to be supplied
+in the form C<< -v <option>=<value> >>.
 
 =over
 
