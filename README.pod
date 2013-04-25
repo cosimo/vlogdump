@@ -77,6 +77,11 @@ in the form C<< -v <option>=<value> >>.
 
 =over
 
+=item client_match=<regexp>
+
+Shows only transactions from clients (IP addresses) matching
+a given regular expression.
+
 =item show_req_headers=0|1
 
 Turn on or off the output of HTTP request headers
