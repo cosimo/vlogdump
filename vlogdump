@@ -21,6 +21,10 @@
 #   show_resp_headers=0|1
 #       Turn on or off the output of HTTP response headers
 #
+#   client_match=<regexp>
+#       Show only the transactions coming from an IP address
+#       matching the given regular expression.
+#
 #   req_headers_match=<regexp>
 #       Shows only transactions with request headers
 #       (any header) matching the given regular expression.
