@@ -132,6 +132,14 @@ for example C<only_slow=500>. Value is in milliseconds.
 Show only the transactions for URLs matching the
 given regular expression.
 
+Prepend '!' to the pattern to negate the meaning,
+to display only transactions where the URL *does not* match
+the given regular expression.
+
+Example:
+
+    varnishlog | vlogdump -v url_match='!/assets'
+
 =back
 
 =head1 AUTHOR

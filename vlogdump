@@ -63,6 +63,10 @@
 #       Show only the transactions for URLs matching the
 #       given regular expression
 #
+#       Prepend '!' to the pattern to negate the meaning,
+#       to display only transactions that *do not* match the
+#       pattern.
+#
 # AUTHOR
 #   Cosimo Streppone <cosimo@opera.com>
 #
@@ -84,7 +88,7 @@ BEGIN {
     # '!' as start char negates the meaning
     req_headers_match_positive = 1
     if (req_headers_match && substr(req_headers_match, 1, 1) == "!") {
-	req_headers_match = substr(req_headers_match, 2)
+        req_headers_match = substr(req_headers_match, 2)
         req_headers_match_positive = 0
     }
 
@@ -92,6 +96,12 @@ BEGIN {
     if (resp_headers_match && substr(resp_headers_match, 1, 1) == "!") {
         resp_headers_match = substr(resp_headers_match, 2)
         resp_headers_match_positive = 0
+    }
+
+    url_match_positive = 1
+    if (url_match && substr(url_match, 1, 1) == "!") {
+        url_match = substr(url_match, 2)
+        url_match_positive = 0
     }
 
 }
@@ -147,9 +157,12 @@ function show_request () {
             return 0
     }
 
-    if (url_match)
-        if (Transaction[xid, "req.url"] !~ url_match)
+    if (url_match) {
+        if (url_match_positive == 1 && Transaction[xid, "req.url"] !~ url_match)
             return 0
+        if (url_match_positive == 0 && Transaction[xid, "req.url"] ~ url_match)
+            return 0
+    }
 
     if (only_hits)
         if (Transaction[xid, "vcl_recv.hit"] == 0)
