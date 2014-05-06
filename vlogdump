@@ -324,7 +324,9 @@ $2 == "TxHeader" && $3 == "c" {
 }
 
 #
-# VCL_call and VCL_return work in pairs.
+# VCL_call and VCL_return work in pairs in 2.x.
+# (This is not true anymore in 3.x)
+#
 # They will always be in order, one VCL_call then its
 # corresponding VCL_return logtag that gives you
 # the result of the VCL_call.
@@ -332,7 +334,17 @@ $2 == "TxHeader" && $3 == "c" {
 
 $2 == "VCL_call" && $3 == "c" {
     xid = lookup_transaction($1)
-    CurrentVclCall[xid] = $4
+
+    # <nn> VCL_call c recv lookup
+    # <nn> VCL_call c hit deliver
+    if ($5) {
+        Transaction[xid, "vcl_" $4] = $5
+    }
+    # <nn> VCL_call   c recv
+    # <nn> VCL_return c lookup
+    else {
+        CurrentVclCall[xid] = $4
+    }
 }
 
 $2 == "VCL_return" && $3 == "c" {
