@@ -370,7 +370,7 @@ $2 == "ReqEnd" {
     #print "REQEND   " $4
 
     xid = $4
-    RequestsPerClient[Transaction[xid, "req.client"]]++
+    #RequestsPerClient[Transaction[xid, "req.client"]]++
 
     hit_or_miss = request_was_a_hit(xid) \
         ? green("HIT") \
