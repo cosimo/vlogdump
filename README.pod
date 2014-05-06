@@ -11,6 +11,8 @@ about them.
 This tool is meant to help when setting up or troubleshooting
 a varnish configuration.
 
+It's confirmed working with Varnish 2.x and 3.x.
+
 =head1 EXAMPLES
 
 Here's some examples of usage.
