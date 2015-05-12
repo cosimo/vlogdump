@@ -110,6 +110,15 @@ Prepend '!' to the pattern to negate the meaning,
 to display only transactions that *do not* match the
 pattern.
 
+=item req_method=<regexp>
+
+Shows only transactions with the given HTTP request
+method, or a method that matches the given regexp.
+
+Prepend '!' to the pattern to negate the meaning,
+to display only transactions that *do not* match the
+pattern.
+
 =item only_hits=0|1
 
 Shows only transactions that were served from the cache

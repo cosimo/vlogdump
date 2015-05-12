@@ -41,6 +41,14 @@
 #       to display only transactions that *do not* match the
 #       pattern.
 #
+#   req_method=<regexp>
+#       Shows only transactions with the given HTTP request
+#       method, or a method that matches the given regexp.
+#
+#       Prepend '!' to the pattern to negate the meaning,
+#       to display only transactions that *do not* match the
+#       pattern.
+#
 #   only_hits=0|1
 #       Shows only cache hits
 #
@@ -104,6 +112,12 @@ BEGIN {
         url_match_positive = 0
     }
 
+    req_method_match_positive = 1
+    if (req_method && substr(req_method, 1, 1) == "!") {
+        req_method = substr(req_method, 2)
+        req_method_match_positive = 0
+    }
+
 }
 
 #
@@ -161,6 +175,13 @@ function show_request () {
         if (url_match_positive == 1 && Transaction[xid, "req.url"] !~ url_match)
             return 0
         if (url_match_positive == 0 && Transaction[xid, "req.url"] ~ url_match)
+            return 0
+    }
+
+    if (req_method) {
+        if (req_method_match_positive == 1 && Transaction[xid, "req.request"] !~ req_method)
+            return 0
+        if (req_method_match_positive == 0 && Transaction[xid, "req.request"] ~ req_method)
             return 0
     }
 
