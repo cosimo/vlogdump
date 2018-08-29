@@ -93,6 +93,9 @@ BEGIN {
     # Total number of requests
     requests = 0
 
+    # In-flight transaction ID
+    xid = ""
+
     # '!' as start char negates the meaning
     req_headers_match_positive = 1
     if (req_headers_match && substr(req_headers_match, 1, 1) == "!") {
@@ -124,7 +127,7 @@ BEGIN {
 # Given the current transaction logtags,
 # understand if it was a cache hit or miss
 #
-function request_was_a_hit (XID) {
+function request_was_a_hit_v3 (XID) {
 
     vcl_recv = Transaction[XID, "vcl_recv"]
     if (vcl_recv != "lookup")
@@ -147,6 +150,29 @@ function request_was_a_hit (XID) {
     # We can assume it was a hit
     return 1
 }
+
+function request_was_a_hit_v4 (XID) {
+
+    vcl_recv = Transaction[XID, "vcl_RECV"]
+    if (vcl_recv != "hash")
+        return 0
+
+    vcl_hash = Transaction[XID, "vcl_HASH"]
+    if (vcl_hash != "lookup")
+        return 0
+
+    vcl_hit = Transaction[XID, "vcl_HIT"]
+    if (vcl_hit != "deliver")
+        return 0
+
+    vcl_deliver = Transaction[XID, "vcl_DELIVER"]
+    if (vcl_deliver != "deliver")
+        return 0
+
+    # We can assume it was a hit
+    return 1
+}
+
 
 #
 # Logic that determines whether a request is shown or hidden
@@ -218,6 +244,10 @@ function green (STRING) {
     return "\033[1;32m" STRING "\033[0m"
 }
 
+function orange (STRING) {
+    return "\033[1;33m" STRING "\033[0m"
+}
+
 function print_global_stats () {
     printf "\n\nTotal number of requests: %d\n\n", requests
     #printf "In-flight transactions: %d\n", length(Transaction)
@@ -225,26 +255,53 @@ function print_global_stats () {
 
 #  292 Debug        - "herding"
 $2 == "Debug" {
-    xid = lookup_transaction($1)
+    #xid = lookup_transaction($1)
     Transaction[xid, "debug"] = Transaction[xid, "debug"] $4
 }
 
-$2 == "SessionOpen" {
+$2 == "SessionOpen" || $2 == "SessOpen" {
     session = $1
     client = $4
     #print "-> Connection from " $4
     Session[session, "client"] = client
 }
 
-$2 == "SessionClose" {
+$2 == "SessionClose" || $2 == "SessClose" {
     session = $1
     client = Session[session, "client"] ? Session[session, "client"] : "-"
     delete Session[session, "client"]
     #print "<- " client " disconnected"
 }
 
+# *   << Request  >> 963967085
+$1 == "*" && $3 == "Request" {
+    requests++
+    xid = $5
+    session_start = 0
+    start_time = 0
+    backend_resp_time = 0
+    end_time = 0
+    #print "XID " xid
+}
+
+# -   Begin          req 963967084 rxreq
+$2 == "Begin" && $xid {
+    session = $4
+    CurrentTransaction[session] = xid
+    #print "BEGIN " xid
+}
+
+# -   ReqStart       127.0.0.1 29664
+$2 == "ReqStart" && $3 != "c" && $3 != "b" {
+    #print "REQSTART " $xid " client=" $3
+    client = $3
+    Transaction[xid, "req.client"] = client ? client : (Session[session, "client"] ? Session[session, "client"] : "-")
+    Transaction[xid, "vcl_recv.hit"] = 0
+    Transaction[xid, "hit"] = 0
+}
+
 # 205 ReqStart     c 10.195.15.91 56529 933976005
-$2 == "ReqStart" {
+$2 == "ReqStart" && $3 == "c" {
     #print "REQSTART " $4
     requests++
     session = $1
@@ -263,29 +320,43 @@ $2 == "RxRequest" && $3 == "c" {
     Transaction[xid, "req.request"] = $4
 }
 
+# -   ReqMethod      GET
+$2 == "ReqMethod" {
+    Transaction[xid, "req.request"] = $3
+}
+
 #  205 RxProtocol   c HTTP/1.1
 $2 == "RxProtocol" && $3 == "c" {
     xid = lookup_transaction($1)
     Transaction[xid, "req.proto"] = $4
 }
 
-#  205 RxURL        c /api/1.0/suggestions/list?count=200&category=te&country=zz&language=en
+# -   ReqProtocol    HTTP/1.0
+$2 == "ReqProtocol" {
+    Transaction[xid, "req.proto"] = $3
+}
+
+#  205 RxURL        c /api/1.0/test
 $2 == "RxURL" && $3 == "c" {
     xid = lookup_transaction($1)
     Transaction[xid, "req.url"] = $4
 }
 
-#  205 RxHeader     c Host: api.recsys.opera.com
+$2 == "ReqURL" {
+    Transaction[xid, "req.url"] = $3
+}
+
+#  205 RxHeader     c Host: api.example.com
 $2 == "RxHeader" && $3 == "c" {
     xid = lookup_transaction($1)
 
     RxHeaders[xid] = RxHeaders[xid] \
-        "        req.http." substr($4, 0, length($4) - 1) \
+        "        req.http." substr($4, 0, length($4)) \
         " = " substr($0, 23 + length($4)) "\n"
 
     # Our load balancer stores the real client IP
     # in this HTTP header (if available)
-    if ($4 == "rlnclientipaddr:") {
+    if ($4 == "rlnclientipaddr:" || $4 == "X-Real-IP") {
         Transaction[xid, "client.ip"] = $5
     }
     else {
@@ -294,6 +365,23 @@ $2 == "RxHeader" && $3 == "c" {
             : "-"
     }
 }
+
+# -   ReqHeader      Limit-Path: /campaigns/
+$2 == "ReqHeader" {
+    RxHeaders[xid] = RxHeaders[xid] \
+        "        req.http." substr($3, 0, length($3) - 1) \
+        " = " substr($0, 21 + length($3)) "\n"
+
+    if ($3 == "rlnclientipaddr:" || $3 == "X-Real-IP:") {
+        Transaction[xid, "client.ip"] = $4
+    }
+}
+
+# -   ReqUnset      Limit-Path: /campaigns/
+$2 == "ReqUnset" {
+    # TODO Remove specific header from RxHeaders[xid]
+}
+
 
 # When varnish logs a "Hit" entry (SLT_Hit), it means the
 # vcl_recv() function has given a go for serving the request
@@ -314,26 +402,43 @@ $2 == "RxHeader" && $3 == "c" {
 # in cache, which technically would make it a hit.
 # 
 #  205 Hit          c 933975905
-$2 == "Hit" {
+$2 == "Hit" && $3 == "c" {
     xid = lookup_transaction($1)
     # $4 is the original xid of the cached object
     Transaction[xid, "vcl_recv.hit"] = $4
 }
 
+$2 == "Hit" && $3 != "c" && $3 != "b" {
+    Transaction[xid, "vcl_recv.hit"] = $3
+}
+
 $2 == "TxStatus" && $3 == "c" {
     xid = lookup_transaction($1)
-	Transaction[xid, "beresp.status"] = $4
+    Transaction[xid, "beresp.status"] = $4
+}
+
+$2 == "RespStatus" {
+    Transaction[xid, "beresp.status"] = $3
 }
 
 $2 == "TxResponse" && $3 == "c" {
     xid = lookup_transaction($1)
-	Transaction[xid, "beresp.status"] = Transaction[xid, "beresp.status"] \
+    Transaction[xid, "beresp.status"] = Transaction[xid, "beresp.status"] \
         " " substr($0, 22)
+}
+
+$2 == "RespReason" {
+    Transaction[xid, "beresp.status"] = Transaction[xid, "beresp.status"] \
+        " " substr($0, 19)
 }
 
 $2 == "TxProtocol" && $3 == "c" {
     xid = lookup_transaction($1)
-	Transaction[xid, "beresp.proto"] = $4
+    Transaction[xid, "beresp.proto"] = $4
+}
+
+$2 == "RespProtocol" {
+    Transaction[xid, "beresp.proto"] = $3
 }
 
 $2 == "TxHeader" && $3 == "c" {
@@ -342,6 +447,12 @@ $2 == "TxHeader" && $3 == "c" {
     TxHeaders[xid] = TxHeaders[xid] \
         "        beresp.http." substr($4, 0, length($4) - 1) \
         " = " substr($0, 23 + length($4)) "\n"
+}
+
+$2 == "RespHeader" {
+    TxHeaders[xid] = TxHeaders[xid] \
+        "        beresp.http." substr($3, 0, length($3) - 1) \
+        " = " substr($0, 20 + length($3)) "\n"
 }
 
 #
@@ -368,6 +479,10 @@ $2 == "VCL_call" && $3 == "c" {
     }
 }
 
+$2 == "VCL_call" && $3 != "c" && $3 != "b" {
+    CurrentVclCall[xid] = $3
+}
+
 $2 == "VCL_return" && $3 == "c" {
     xid = lookup_transaction($1)
 
@@ -381,33 +496,72 @@ $2 == "VCL_return" && $3 == "c" {
     delete CurrentVclCall[xid]
 }
 
+$2 == "VCL_return" && $3 != "c" && $3 != "b" {
+    curr_vcl_sub = "vcl_" CurrentVclCall[xid]
+    ret_value = $3
+
+    # Record the return value of the current VCL_call
+    Transaction[xid, curr_vcl_sub] = ret_value
+
+    # No vcl_call currently engaged anymore
+    delete CurrentVclCall[xid]
+}
+
+$2 == "Timestamp" && $3 == "Start:" {
+    session_start = $4
+}
+
+$2 == "Timestamp" && $3 == "Req:" {
+    start_time = $4
+}
+
+$2 == "Timestamp" && $3 == "Fetch:" {
+    backend_resp_time = $5 * 1000
+}
+
+$2 == "Timestamp" && $3 == "Pipe:" {
+    Transaction[xid, "PIPE"] = 1
+    backend_resp_time = $5 * 1000
+}
+
+$2 == "Timestamp" && $3 == "Resp:" {
+    end_time = $4
+}
+
 #                 xid    start_time    done_time    session_started  backend_resp_time
 #                  |        |              |             |            | 
 #                  |        |              |             |            |    delivery_time
 # 205 ReqEnd c 933976005 1365603497.937 1365603497.937 2.2056311 0.056505    |
 #  86 ReqEnd c 933984866 1365604497.837 1365604497.883 0.0000791 0.05228 0.000056
-$2 == "ReqEnd" {
+$2 == "ReqEnd" || ($2 == "End" && xid) {
 
-    #print "REQEND   " $4
+    # Pre varnish-4 format
+    if ($3 == "c") {
+        xid = $4
+        start_time = $5
+        end_time = $6
+        session_start = $7
+        backend_resp_time = $8 * 1000
+    }
 
-    xid = $4
+    #print "REQEND   2=" $2 " xid=" xid
     #RequestsPerClient[Transaction[xid, "req.client"]]++
 
-    hit_or_miss = request_was_a_hit(xid) \
+    hit_or_miss = request_was_a_hit_v4(xid) || request_was_a_hit_v3(xid) \
         ? green("HIT") \
-        : red("MISS")
+        : Transaction[xid, "PIPE"] \
+            ? orange("(pipe)") \
+            : red("MISS")
 
-    start_time = $5
-    end_time = $6
-    session_start = $7
-    backend_resp_time = $8 * 1000
-    time_to_serve = ((end_time - start_time) * 1000)
+    time_to_serve = $2 == "End" \
+        ? backend_resp_time \
+        : (end_time - start_time) * 1000
 
     if (! show_request())
         next
 
     printf "%15s => %s %s %s %s\n", \
-        Transaction[xid, "req.client"], \
+        Transaction[xid, "client.ip"], \
         Transaction[xid, "req.request"], \
         Transaction[xid, "req.url"], \
         Transaction[xid, "req.proto"], \
@@ -432,10 +586,11 @@ $2 == "ReqEnd" {
     delete RxHeaders[xid]
     delete TxHeaders[xid]
 
+    xid = ""
 }
 
 END {
     print_global_stats()
 }
 
-# vim: ts=4 sw=4 tw=78
+# vim: ts=4 sw=4 tw=78 bg=dark nu
