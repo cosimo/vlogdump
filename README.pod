@@ -11,7 +11,9 @@ about them.
 This tool is meant to help when setting up or troubleshooting
 a varnish configuration.
 
-It's confirmed working with Varnish 2.x and 3.x.
+It's confirmed working with Varnish 2.x, 3.x, 4.x and 5.x.
+For some versions, it might be necessary to use a specific
+development branch instead of master.
 
 =head1 EXAMPLES
 
@@ -155,4 +157,4 @@ Example:
 
 =head1 AUTHOR
 
-Cosimo Streppone, C<< cosimo@opera.com >>
+Cosimo Streppone, C<< cosimo@streppone.it >>
