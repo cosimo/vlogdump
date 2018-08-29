@@ -409,7 +409,7 @@ $2 == "Hit" && $3 == "c" {
 }
 
 $2 == "Hit" && $3 != "c" && $3 != "b" {
-    Transaction[xid, "vcl_recv.hit"] = $3
+    Transaction[xid, "vcl_recv.hit"] = 1
 }
 
 $2 == "TxStatus" && $3 == "c" {
