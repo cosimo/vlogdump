@@ -1,6 +1,6 @@
 =head1 NAME
 
-vlogdump
+vlogdump4
 
 =head1 DESCRIPTION
 
@@ -11,7 +11,8 @@ about them.
 This tool is meant to help when setting up or troubleshooting
 a varnish configuration.
 
-It's confirmed working with Varnish 2.x and 3.x and 5.x
+This is a specific version that works with Varnish 4.x.
+It should work with other versions as well, but it probably won't.
 
 =head1 EXAMPLES
 
@@ -155,4 +156,4 @@ Example:
 
 =head1 AUTHOR
 
-Cosimo Streppone, C<< cosimo@opera.com >>
+Cosimo Streppone, C<< cosimo@streppone.it >>

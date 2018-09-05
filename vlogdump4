@@ -76,7 +76,7 @@
 #       pattern.
 #
 # AUTHOR
-#   Cosimo Streppone <cosimo@opera.com>
+#   Cosimo Streppone <cosimo@streppone.it>
 #
 
 BEGIN {
@@ -153,26 +153,12 @@ function request_was_a_hit_v3 (XID) {
 
 function request_was_a_hit_v4 (XID) {
 
-    vcl_recv = Transaction[XID, "vcl_RECV"]
-    if (vcl_recv != "hash")
+    if (Transaction[XID, "vcl_recv.hit"] == 1)
+        return 1
+    else
         return 0
 
-    vcl_hash = Transaction[XID, "vcl_HASH"]
-    if (vcl_hash != "lookup")
-        return 0
-
-    vcl_hit = Transaction[XID, "vcl_HIT"]
-    if (vcl_hit != "deliver")
-        return 0
-
-    vcl_deliver = Transaction[XID, "vcl_DELIVER"]
-    if (vcl_deliver != "deliver")
-        return 0
-
-    # We can assume it was a hit
-    return 1
 }
-
 
 #
 # Logic that determines whether a request is shown or hidden
